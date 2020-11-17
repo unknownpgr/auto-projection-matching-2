@@ -2,24 +2,35 @@ import cv2
 import numpy as np
 import math
 
+'''
+
+Dimensions (For my LG gram 17 inch laptop)
+
+Screen height                   22.9cm
+Screen width                    36.65cm
+Screen top edge - camera center 0.65cm
+
+Therefore
+
+Screen center to camera center = 22.9/2+0.65 = 12.1
+
+Distance to object = 38.7cm
+Length of object = 45.4cm
+Camera angle = 2*atan(45.4/2/38.7) = About 61 deg
+
+'''
+
+
 cap = cv2.VideoCapture(0)
 
-theta = 71*math.pi/180
-dist = 26.5
-bias = 125
+CAM_ANGLE = 61*math.pi/180
+DIST = 26.5  # Distance from screen to the observer
+BIAS = 12.1  # Distance from the center of the screen to the center of the camera
 
-cx = 0
-cy = 0
-
-ret, img = cap.read()
-h, w, _ = img.shape
-
-SCR_W = 380
-SCR_H = 265
-
-# 화면 세로 폭 22.9cm
-# 화면 가로 폭 36.65cm
-# 화면 위쪽 경계에서 카메라 중심까지 0.65cm
+IMG_H, IMG_W, _ = cap.read()[1].shape
+SCR_W = 366*2
+SCR_H = 229*2
+SCR_SCALE = 20
 
 
 def track_dot(img, color=30, epsilon=10, thresh=160):
@@ -46,7 +57,7 @@ def track_dot(img, color=30, epsilon=10, thresh=160):
         return 0, 0
 
 
-def get_cam_pos(img_w, img_h, theta, dist, cx, cy, bias):
+def get_cam_pos(img_w, img_h, cam_angle, dist, cx, cy, bias):
     '''
     Calculate relative camera position
     Range = [-1,1]
@@ -55,10 +66,10 @@ def get_cam_pos(img_w, img_h, theta, dist, cx, cy, bias):
     cry = (cy*2-img_h)/img_w
 
     # Get real camera position
-    rx = -dist*math.tan(theta/2)*crx
-    ry = bias-dist*math.tan(theta/2)*cry
+    cam_x = -dist*math.tan(cam_angle/2)*crx
+    cam_y = bias-dist*math.tan(cam_angle/2)*cry
 
-    return rx, ry
+    return cam_x, cam_y
 
 
 def project(cx, cy, cz, ox, oy, oz):
@@ -75,7 +86,7 @@ def project(cx, cy, cz, ox, oy, oz):
 
 def get_cube(x, y, z, d=2):
     '''
-    Get the points and edges of cube
+    Get the points and edges of a cube
     '''
     d /= 2
     return [
@@ -104,35 +115,38 @@ def get_cube(x, y, z, d=2):
 
 
 def get_screen_pos(x, y, scale, scr_w, scr_h):
-    # Scale = screen pixel size / real monitor size (in unit of other data such as real position of camera)
+    '''
+    Convert projected posion (unit=cm,anchor=center) to screen position(unit=pixel,anchor=top lefft)
+    Scale = screen pixel size / real monitor size (in unit of other data such as real position of camera)
+    '''
     x = int(x*scale+scr_w/2)
     y = int(-y*scale+scr_h/2)
     return x, y
 
 
-points, edges = get_cube(0, 0, -10, 4)
-back = cv2.resize(cv2.imread('./room.jpg'), (SCR_W, SCR_H))//2
+points, edges = get_cube(0, 5, -10, 4)
+background = cv2.resize(cv2.imread('./room.jpg'), (SCR_W, SCR_H))//2
 cv2.namedWindow('Video', cv2.WINDOW_FREERATIO)
+
 while True:
     ret, img = cap.read()
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
     cx, cy = track_dot(hsv)
 
-    # Display
+    # Display tracked position
     img[cy, :] = [0, 0, 255]
     img[:, cx] = [255, 0, 0]
     cv2.imshow('img', img)
 
-    rx, ry = get_cam_pos(w, h, theta, dist, cx, cy, bias)
+    cam_x, cam_y = get_cam_pos(IMG_W, IMG_H, CAM_ANGLE, DIST, cx, cy, BIAS)
 
-    screen = np.copy(back)
+    screen = np.copy(background)
 
     for edge in edges:
         x1, y1 = get_screen_pos(
-            *project(rx, ry, -dist, *points[edge[0]]), 10, SCR_W, SCR_H)
+            *project(cam_x, cam_y, -DIST, *points[edge[0]]), SCR_SCALE, SCR_W, SCR_H)
         x2, y2 = get_screen_pos(
-            *project(rx, ry, -dist, *points[edge[1]]), 10, SCR_W, SCR_H)
+            *project(cam_x, cam_y, -DIST, *points[edge[1]]), SCR_SCALE, SCR_W, SCR_H)
         screen = cv2.line(screen, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
     cv2.imshow('Video', screen)
