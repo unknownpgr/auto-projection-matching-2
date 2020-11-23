@@ -19,87 +19,105 @@
     <script type="module">
         import * as THREE from 'https://unpkg.com/three@0.122.0/build/three.module.js';
 
-        const SHADER_VERTEX = `
-        varying vec3 vNormal;
-        uniform vec3 camPos;
-        uniform float ratio;
+        const SHADER_PHONG_VERTEX = `
+            uniform float ratio;
 
-		void main() {
-            vNormal = normalize(vec4(modelMatrix * vec4(normal.xyz,0)).xyz);
-            vec4 objPos = modelMatrix * vec4(position,1.0);
-            vec4 prjPos = vec4(camPos.z*objPos.xy-objPos.z*camPos.xy,0,camPos.z-objPos.z);
-            gl_Position = vec4(prjPos.x,prjPos.y*ratio,prjPos.zw);
-		}
-        `
+            #define PHONG
+            varying vec3 vViewPosition;
+            #ifndef FLAT_SHADED
+                varying vec3 vNormal;
+            #endif
+            #include <common>
+            #include <uv_pars_vertex>
+            #include <uv2_pars_vertex>
+            #include <displacementmap_pars_vertex>
+            #include <envmap_pars_vertex>
+            #include <color_pars_vertex>
+            #include <fog_pars_vertex>
+            #include <morphtarget_pars_vertex>
+            #include <skinning_pars_vertex>
+            #include <shadowmap_pars_vertex>
+            #include <logdepthbuf_pars_vertex>
+            #include <clipping_planes_pars_vertex>
+            void main() {
+                #include <uv_vertex>
+                #include <uv2_vertex>
+                #include <color_vertex>
+                #include <beginnormal_vertex>
+                #include <morphnormal_vertex>
+                #include <skinbase_vertex>
+                #include <skinnormal_vertex>
+                #include <defaultnormal_vertex>
+            #ifndef FLAT_SHADED
+                vNormal = normalize( transformedNormal );
+            #endif
+                #include <begin_vertex>
+                #include <morphtarget_vertex>
+                #include <skinning_vertex>
+                #include <displacementmap_vertex>
+      
+                vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
+                vec4 objPos = modelMatrix * vec4(position,1.0);
+                vec4 prjPos = vec4(cameraPosition.z*objPos.xy-objPos.z*cameraPosition.xy,0,cameraPosition.z-objPos.z);
+                gl_Position = vec4(prjPos.x,prjPos.y*ratio,0.5,prjPos.w);
 
-        const SHADER_FRAG = `
-		varying mediump vec3 vNormal;
-
-		void main() {
-			mediump vec3 light = vec3(1,1,1);
-
-			// ensure it's normalized
-			light = normalize(light);
-
-			// calculate the dot product of
-			// the light to the vertex normal
-			mediump float dProd = min(1.0, max(0.0, dot(vNormal, light)) + 0.1);
-
-			// feed into our frag colour
-			gl_FragColor = vec4(dProd, dProd, dProd, 1.0); 
-		}
+                #include <logdepthbuf_vertex>
+                #include <clipping_planes_vertex>
+                vViewPosition = - mvPosition.xyz;
+                #include <worldpos_vertex>
+                #include <envmap_vertex>
+                #include <shadowmap_vertex>
+                #include <fog_vertex>
+            }
         `
 
         const uniforms = {
-            camPos: { value: { x: -1, y: 0, z: 0.5 } },
             ratio: { value: window.innerWidth / window.innerHeight }
         }
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0, 1000);
-        camera.position.z = 10
+        const camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.01, 1000);
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         // define geometry and material
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.ShaderMaterial({
-            vertexShader: SHADER_VERTEX,
-            fragmentShader: SHADER_FRAG,
+        const customUniforms = THREE.UniformsUtils.merge([
+            THREE.ShaderLib.phong.uniforms,
             uniforms
+        ]);
+        console.log(THREE.ShaderLib.phong.fragmentShader)
+        const customMaterial = new THREE.ShaderMaterial({
+            uniforms: customUniforms,
+            vertexShader: SHADER_PHONG_VERTEX,
+            fragmentShader: THREE.ShaderLib.phong.fragmentShader,
+            lights: true,
+            name: 'custom-material'
         });
 
         // mesh 'em together
-        const cube = new THREE.Mesh(geometry, material);
-        cube.scale.set(0.15, 0.15, 0.15);
-        cube.position.y = 0.5;
-        cube.position.x = 1;
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), customMaterial);
+        cube.scale.set(0.2, 0.2, 0.2);
+        cube.position.x = 0;
         cube.position.y = 0;
+        cube.position.z = 0.5;
+
+        camera.position.x = -1
+        camera.position.z = 2
 
         // add to scene
         scene.add(cube);
-
-        let camX = 0, camY = 0;
-
-        async function updatePos() {
-            let result = await (await fetch('http://localhost:8080')).json()
-            camX = result[0]
-            camY = result[1]
-            setTimeout(updatePos, 0);
-        }
-        updatePos()
+        scene.add(new THREE.DirectionalLight())
+        scene.add(new THREE.AmbientLight("#303030"))
 
         function animate() {
-            material.uniforms.camPos.value.x = camX
-            material.uniforms.camPos.value.y = camY
+            requestAnimationFrame(animate)
             cube.rotation.z += 0.01;
             cube.rotation.x += 0.01;
             renderer.render(scene, camera);
-            requestAnimationFrame(animate)
         }
-        animate();
+        animate()
     </script>
 </body>
 
