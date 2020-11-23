@@ -18,6 +18,7 @@
 <body>
     <script type="module">
         import * as THREE from 'https://unpkg.com/three@0.122.0/build/three.module.js';
+        import { STLLoader } from 'https://unpkg.com/three@0.122.0/examples/jsm/loaders/STLLoader.js';
 
         const SHADER_PHONG_VERTEX = `
             uniform float ratio;
@@ -76,10 +77,14 @@
         }
 
         const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xbfe3dd);
+
         const camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.01, 1000);
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         // define geometry and material
@@ -87,7 +92,7 @@
             THREE.ShaderLib.phong.uniforms,
             uniforms
         ]);
-        console.log(THREE.ShaderLib.phong.fragmentShader)
+
         const customMaterial = new THREE.ShaderMaterial({
             uniforms: customUniforms,
             vertexShader: SHADER_PHONG_VERTEX,
@@ -96,27 +101,39 @@
             name: 'custom-material'
         });
 
-        // mesh 'em together
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), customMaterial);
-        cube.scale.set(0.2, 0.2, 0.2);
-        cube.position.x = 0;
-        cube.position.y = 0;
-        cube.position.z = 0.5;
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x000000, 0.4));
 
-        camera.position.x = -1
-        camera.position.z = 2
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 2, 8);
+        scene.add(dirLight);
 
-        // add to scene
-        scene.add(cube);
-        scene.add(new THREE.DirectionalLight())
-        scene.add(new THREE.AmbientLight("#303030"))
+        const loader = new STLLoader();
+        let mesh;
+        loader.load('model.stl', function (geometry) {
+            mesh = new THREE.Mesh(geometry, customMaterial);
+            mesh.rotation.set(0, 0, - Math.PI / 2);
+            mesh.scale.set(0.01, 0.01, 0.01);
 
-        function animate() {
-            requestAnimationFrame(animate)
-            cube.rotation.z += 0.01;
-            cube.rotation.x += 0.01;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            scene.add(mesh);
+        });
+
+        camera.position.set(-1, 0, 1);
+
+        function animate(t) {
             renderer.render(scene, camera);
+            if (mesh) {
+                if ((t % 2000) < 1000) {
+                    mesh.position.set(Math.sin(t * Math.PI / 1000) * 0.5 - 0.6, 0, 0)
+                } else {
+                    mesh.position.set(-0.6, 0, -Math.sin((t - 1000) * Math.PI / 1000) * 0.3)
+                }
+            }
+            requestAnimationFrame(animate);
         }
+
         animate()
     </script>
 </body>
