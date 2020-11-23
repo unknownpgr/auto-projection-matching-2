@@ -24,7 +24,7 @@ Camera angle = 2*atan(45.4/2/38.7) = About 61 deg
 cap = cv2.VideoCapture(0)
 
 CAM_ANGLE = 61*math.pi/180
-DIST = 26.5  # Distance from screen to the observer
+DIST = 22.5  # Distance from screen to the observer
 BIAS = 12.1  # Distance from the center of the screen to the center of the camera
 
 IMG_H, IMG_W, _ = cap.read()[1].shape
@@ -124,11 +124,13 @@ def get_screen_pos(x, y, scale, scr_w, scr_h):
     return x, y
 
 
-points, edges = get_cube(0, 5, -10, 4)
+pointsA, edgesA = get_cube(0, 5, -4, 8)
 background = cv2.resize(cv2.imread('./room.jpg'), (SCR_W, SCR_H))//2
 cv2.namedWindow('Video', cv2.WINDOW_FREERATIO)
 
+t = 0
 while True:
+    t += 0.1
     ret, img = cap.read()
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     cx, cy = track_dot(hsv)
@@ -142,11 +144,26 @@ while True:
 
     screen = np.copy(background)
 
-    for edge in edges:
+    for i in range(0, SCR_H, SCR_H//10):
+        screen = cv2.line(screen, (0, i), (SCR_W, i), (128, 128, 128), 1)
+
+    for j in range(0, SCR_W, SCR_H//10):
+        screen = cv2.line(screen, (j, 0), (j, SCR_H), (128, 128, 128), 1)
+
+    for edge in edgesA:
         x1, y1 = get_screen_pos(
-            *project(cam_x, cam_y, -DIST, *points[edge[0]]), SCR_SCALE, SCR_W, SCR_H)
+            *project(cam_x, cam_y, -DIST, *pointsA[edge[0]]), SCR_SCALE, SCR_W, SCR_H)
         x2, y2 = get_screen_pos(
-            *project(cam_x, cam_y, -DIST, *points[edge[1]]), SCR_SCALE, SCR_W, SCR_H)
+            *project(cam_x, cam_y, -DIST, *pointsA[edge[1]]), SCR_SCALE, SCR_W, SCR_H)
+        screen = cv2.line(screen, (x1, y1), (x2, y2), (255, 255, 255), 1)
+
+    pointsB, edgesB = get_cube(math.sin(t)*4, 5, -4, 4)
+
+    for edge in edgesB:
+        x1, y1 = get_screen_pos(
+            *project(cam_x, cam_y, -DIST, *pointsB[edge[0]]), SCR_SCALE, SCR_W, SCR_H)
+        x2, y2 = get_screen_pos(
+            *project(cam_x, cam_y, -DIST, *pointsB[edge[1]]), SCR_SCALE, SCR_W, SCR_H)
         screen = cv2.line(screen, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
     cv2.imshow('Video', screen)
