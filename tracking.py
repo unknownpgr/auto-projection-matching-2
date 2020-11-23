@@ -24,7 +24,7 @@ Camera angle = 2*atan(45.4/2/38.7) = About 61 deg
 cap = cv2.VideoCapture(0)
 
 CAM_ANGLE = 61*math.pi/180
-DIST = 22.5  # Distance from screen to the observer
+DIST = 20  # Distance from screen to the observer
 BIAS = 12.1  # Distance from the center of the screen to the center of the camera
 
 IMG_H, IMG_W, _ = cap.read()[1].shape
@@ -114,6 +114,41 @@ def get_cube(x, y, z, d=2):
     ]
 
 
+def get_rotated_cube(x, y, z, t, d=2):
+    '''
+    Get the points and edges of a cube
+    '''
+    d /= 2
+    return [
+        [x+d*math.sin(t+0*math.pi/2), y+d, z+d*math.cos(t+0*math.pi/2)],
+        [x+d*math.sin(t+0*math.pi/2), y-d, z+d*math.cos(t+0*math.pi/2)],
+        [x+d*math.sin(t+1*math.pi/2), y+d, z+d*math.cos(t+1*math.pi/2)],
+        [x+d*math.sin(t+1*math.pi/2), y-d, z+d*math.cos(t+1*math.pi/2)],
+        [x+d*math.sin(t+2*math.pi/2), y+d, z+d*math.cos(t+2*math.pi/2)],
+        [x+d*math.sin(t+2*math.pi/2), y-d, z+d*math.cos(t+2*math.pi/2)],
+        [x+d*math.sin(t+3*math.pi/2), y+d, z+d*math.cos(t+3*math.pi/2)],
+        [x+d*math.sin(t+3*math.pi/2), y-d, z+d*math.cos(t+3*math.pi/2)]
+    ], [
+        # Vertical lines
+        [0, 1],
+        [2, 3],
+        [4, 5],
+        [6, 7],
+
+        # Top
+        [0, 2],
+        [2, 4],
+        [4, 6],
+        [6, 0],
+
+        # Bottom
+        [1, 7],
+        [3, 1],
+        [5, 3],
+        [7, 5]
+    ]
+
+
 def get_screen_pos(x, y, scale, scr_w, scr_h):
     '''
     Convert projected posion (unit=cm,anchor=center) to screen position(unit=pixel,anchor=top lefft)
@@ -150,6 +185,7 @@ while True:
     for j in range(0, SCR_W, SCR_H//10):
         screen = cv2.line(screen, (j, 0), (j, SCR_H), (128, 128, 128), 1)
 
+    # Static box
     for edge in edgesA:
         x1, y1 = get_screen_pos(
             *project(cam_x, cam_y, -DIST, *pointsA[edge[0]]), SCR_SCALE, SCR_W, SCR_H)
@@ -157,7 +193,9 @@ while True:
             *project(cam_x, cam_y, -DIST, *pointsA[edge[1]]), SCR_SCALE, SCR_W, SCR_H)
         screen = cv2.line(screen, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
-    pointsB, edgesB = get_cube(math.sin(t)*4, 5, -4, 4)
+    # Rotating box
+    pointsB, edgesB = get_rotated_cube(
+        math.cos(t)*4, 5, -4, 2*math.atan(10*math.cos(t)), 4)
 
     for edge in edgesB:
         x1, y1 = get_screen_pos(
