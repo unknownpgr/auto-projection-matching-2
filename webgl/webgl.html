@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>My first three.js app</title>
+    <title>Reverse 3D projection</title>
     <style>
         body {
             margin: 0;
@@ -60,7 +60,7 @@
                 vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
                 vec4 objPos = modelMatrix * vec4(position,1.0);
                 vec4 prjPos = vec4(cameraPosition.z*objPos.xy-objPos.z*cameraPosition.xy,0,cameraPosition.z-objPos.z);
-                gl_Position = vec4(prjPos.x,prjPos.y*ratio,0.5,prjPos.w);
+                gl_Position = vec4(prjPos.x,prjPos.y*ratio,-objPos.z,prjPos.w);
 
                 #include <logdepthbuf_vertex>
                 #include <clipping_planes_vertex>
@@ -77,9 +77,12 @@
         }
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xbfe3dd);
+        scene.background = new THREE.Color(0x303030);
 
-        const camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.01, 1000);
+        const camera = new THREE.PerspectiveCamera(180, window.innerWidth / window.innerHeight, 0.001, 10000);
+        const width = window.innerWidth;
+        const height = window.innerHight;
+        // const camera = new THREE.OrthographicCamera(width, - width, height, -height, 0.0001, 1000);
 
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -103,7 +106,7 @@
 
         scene.add(new THREE.HemisphereLight(0xffffff, 0x000000, 0.4));
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
         dirLight.position.set(5, 2, 8);
         scene.add(dirLight);
 
@@ -111,8 +114,9 @@
         let mesh;
         loader.load('model.stl', function (geometry) {
             mesh = new THREE.Mesh(geometry, customMaterial);
-            mesh.rotation.set(0, 0, - Math.PI / 2);
-            mesh.scale.set(0.01, 0.01, 0.01);
+            mesh.rotation.set(0, 0, -Math.PI / 4);
+            mesh.scale.set(0.002, 0.002, 0.002);
+            mesh.position.set(-0.25, 0, 0.25)
 
             mesh.castShadow = true;
             mesh.receiveShadow = true;
@@ -121,15 +125,12 @@
         });
 
         camera.position.set(-1, 0, 1);
+        // camera.rotation.z = -Math.PI / 2
 
         function animate(t) {
             renderer.render(scene, camera);
             if (mesh) {
-                if ((t % 2000) < 1000) {
-                    mesh.position.set(Math.sin(t * Math.PI / 1000) * 0.5 - 0.6, 0, 0)
-                } else {
-                    mesh.position.set(-0.6, 0, -Math.sin((t - 1000) * Math.PI / 1000) * 0.3)
-                }
+                mesh.rotation.z += 0.01
             }
             requestAnimationFrame(animate);
         }
